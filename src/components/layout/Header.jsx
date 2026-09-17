@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { FiSearch, FiShoppingCart, FiMenu, FiX } from "react-icons/fi";
+import { FiSearch, FiShoppingCart, FiMenu, FiX, FiLogOut } from "react-icons/fi";
 import { HiOutlineUser } from "react-icons/hi2";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
+import { logout } from "../../store/slices/authSlice";
 
 const nav = [
   { to: "/", label: "НАЧАЛО" },
@@ -16,8 +17,25 @@ const nav = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const totalQty = useSelector((s) => s.cart.totalQty);
+  const isAuthenticated = useSelector((s) => s.auth.isAuthenticated);
+  const me = useSelector((s) => s.users.me);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const handleLogout = () => {
+    setUserMenuOpen(false);
+    dispatch(logout()).then(() => navigate("/"));
+  };
+
+  const handleUserIconClick = () => {
+    if (isAuthenticated) {
+      setUserMenuOpen((v) => !v);
+    } else {
+      navigate("/auth");
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-black/5">
@@ -79,14 +97,45 @@ export default function Header() {
           >
             <FiSearch size={20} />
           </button>
-          <button
-            className="hidden sm:grid place-items-center w-9 h-9 hover:text-[#1e4d2b] cursor-pointer"
-            onClick={() => {
-              navigate("/auth");
-            }}
-          >
-            <HiOutlineUser size={21} />
-          </button>
+          <div className="relative hidden sm:block">
+            <button
+              className="grid place-items-center w-9 h-9 hover:text-[#1e4d2b] cursor-pointer"
+              onClick={handleUserIconClick}
+            >
+              <HiOutlineUser size={21} />
+            </button>
+
+            <AnimatePresence>
+              {userMenuOpen && isAuthenticated && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="absolute right-0 mt-2 w-52 rounded-xl border border-black/10 bg-white shadow-lg p-2 z-50"
+                >
+                  <div className="px-3 py-2 text-[13px] text-[#0f2e1f]/70 border-b border-black/5 mb-1">
+                    {me?.firstName ? `Здравей, ${me.firstName}` : "Профил"}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      navigate("/account");
+                    }}
+                    className="w-full text-left px-3 py-2 text-[14px] font-semibold rounded-lg hover:bg-[#eef4ec] text-[#0f2e1f]"
+                  >
+                    Моят профил
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-[14px] font-semibold rounded-lg hover:bg-red-50 text-red-600"
+                  >
+                    <FiLogOut size={16} />
+                    Изход
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <button
             className="relative grid place-items-center w-9 h-9 hover:text-[#1e4d2b] cursor-pointer"
             onClick={() => {
