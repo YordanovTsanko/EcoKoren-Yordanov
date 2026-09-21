@@ -14,6 +14,8 @@ import AboutUs from "./pages/AboutUs.jsx";
 import Store from "./pages/Store.jsx";
 import Auth from "./pages/Auth.jsx";
 import Cart from "./pages/Cart.jsx";
+
+import Account from "./pages/account/Account.jsx";
 import { fetchMe } from "./store/slices/usersSlice";
 
 export default function App() {
@@ -47,7 +49,7 @@ export default function App() {
               Добави тук всеки нов route, който трябва да е само за логнати потребители,
               напр. /account, /orders, /checkout */}
           <Route element={<ProtectedRoute />}>
-            {/* <Route path="/account" element={<Account />} /> */}
+            <Route path="/account" element={<Account />} />
             {/* <Route path="/orders" element={<Orders />} /> */}
           </Route>
 
