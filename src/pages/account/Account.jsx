@@ -5,8 +5,8 @@ import { FiMapPin, FiLogOut, FiEdit3, FiPhone, FiMail, FiFileText, FiX } from "r
 import { HiOutlineUser } from "react-icons/hi2";
 import { logout } from "../../store/slices/authSlice";
 import { updateMe } from "../../store/slices/usersSlice";
-import ConfirmModal from "../../components/modals/confirmModal";
-import AddressModal from "../../components/modals/addressModal";
+import ConfirmModal from "../../components/modals/ConfirmModal";
+import AddressModal from "../../components/modals/AddressModal";
 
 export default function Account() {
   const navigate = useNavigate();
