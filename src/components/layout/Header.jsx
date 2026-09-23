@@ -13,6 +13,12 @@ import {
   FiSettings,
   FiMapPin,
   FiBell,
+  FiHome,
+  FiShoppingBag,
+  FiTag,
+  FiStar,
+  FiInfo,
+  FiPhone,
 } from "react-icons/fi";
 import { HiOutlineUser } from "react-icons/hi2";
 import { useDispatch, useSelector } from "react-redux";
@@ -26,6 +32,15 @@ const nav = [
   { to: "/new-products", label: "НОВИ ПРОДУКТИ" },
   { to: "/about-us", label: "ЗА НАС" },
   { to: "/contacts", label: "КОНТАКТИ" },
+];
+const navMobile = [
+  { to: "/", label: "НАЧАЛО", icon: FiHome },
+  { to: "/search", label: "ТЪРСЕНЕ", icon: FiSearch },
+  { to: "/store", label: "МАГАЗИН", icon: FiShoppingBag },
+  { to: "/promotions", label: "ПРОМОЦИИ", icon: FiTag },
+  { to: "/new-products", label: "НОВИ ПРОДУКТИ", icon: FiStar },
+  { to: "/about-us", label: "ЗА НАС", icon: FiInfo },
+  { to: "/contacts", label: "КОНТАКТИ", icon: FiPhone },
 ];
 
 const accountMenu = [
@@ -43,11 +58,6 @@ const accountMenu = [
     label: "Любими продукти",
     icon: FiHeart,
     to: "/account/favorites",
-  },
-  {
-    label: "Адреси",
-    icon: FiMapPin,
-    to: "/account/addresses",
   },
   {
     label: "Известия",
@@ -71,6 +81,7 @@ export default function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
   const [desktopSubmenu, setDesktopSubmenu] = useState(null);
+  const [mobileSubmenus, setMobileSubmenus] = useState({});
 
   const userMenuRef = useRef(null);
 
@@ -210,6 +221,7 @@ export default function Header() {
             <NavLink
               key={item.to}
               to={item.to}
+              end 
               className={({ isActive }) =>
                 `text-[13px] xl:text-[14px] font-semibold tracking-wide transition relative pb-1 whitespace-nowrap ${
                   isActive
@@ -345,6 +357,7 @@ export default function Header() {
                                       <NavLink
                                         key={child.to}
                                         to={child.to}
+                                        end 
                                         onClick={closeAllMenus}
                                         className={({ isActive }) =>
                                           `flex items-center px-3 py-2 rounded-lg text-[13px] transition ${
@@ -369,6 +382,7 @@ export default function Header() {
                         <NavLink
                           key={item.to}
                           to={item.to}
+                          end 
                           onClick={closeAllMenus}
                           role="menuitem"
                           className={({ isActive }) =>
@@ -443,55 +457,33 @@ export default function Header() {
             className="lg:hidden border-t border-black/5 bg-white overflow-hidden"
           >
             <div className="container-eco py-3">
-              {/* MOBILE QUICK ACTIONS */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigate("/search");
-                    setOpen(false);
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-black/5 bg-[#f8faf7] px-3 py-3 text-[13px] font-semibold text-[#0f2e1f]"
-                >
-                  <FiSearch size={17} />
-                  Търсене
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigate("/cart");
-                    setOpen(false);
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-black/5 bg-[#f8faf7] px-3 py-3 text-[13px] font-semibold text-[#0f2e1f]"
-                >
-                  <FiShoppingCart size={17} />
-                  Количка
-                </button>
-              </div>
-
               {/* MOBILE NAV */}
               <nav className="flex flex-col">
-                {nav.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    onClick={handleNavClick}
-                    className={({ isActive }) =>
-                      `py-3.5 text-[14px] sm:text-[15px] font-semibold border-b border-black/5 transition ${
-                        isActive
-                          ? "text-[#1e4d2b]"
-                          : "text-[#24382b] hover:text-[#1e4d2b]"
-                      }`
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
+                {navMobile.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end 
+                      onClick={handleNavClick}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 py-3.5 text-[14px] sm:text-[15px] font-semibold border-b border-black/5 transition cursor-pointer ${
+                          isActive
+                            ? "text-[#1e4d2b]"
+                            : "text-[#24382b] hover:text-[#1e4d2b]"
+                        }`
+                      }
+                    >
+                      <Icon size={18} className="shrink-0" />
+                      {item.label}
+                    </NavLink>
+                  );
+                })}
               </nav>
 
               {/* MOBILE ACCOUNT */}
-              <div className="mt-2 border-t border-black/5 pt-2">
+              <div className="mt-2 px-2 text-center bg-[#0f2e1f] rounded-lg">
                 {!isAuthenticated ? (
                   <button
                     type="button"
@@ -499,7 +491,7 @@ export default function Header() {
                       navigate("/auth");
                       setOpen(false);
                     }}
-                    className="w-full flex items-center gap-3 py-3.5 text-[14px] font-semibold text-[#24382b]"
+                    className="w-full flex items-center gap-3 py-3.5 text-[14px] font-semibold text-[#ffffff]"
                   >
                     <HiOutlineUser size={20} />
                     Вход / Регистрация
@@ -509,18 +501,18 @@ export default function Header() {
                     <button
                       type="button"
                       onClick={handleMobileUserClick}
-                      className="w-full flex items-center justify-between gap-3 py-3.5 text-left"
+                      className="w-full flex items-center justify-between gap-3 p-3.5 text-left"
                       aria-expanded={mobileAccountOpen}
                     >
                       <span className="flex items-center gap-3">
-                        <HiOutlineUser size={20} />
+                        <HiOutlineUser size={20} className="text-[#ffffff]" />
 
                         <span>
-                          <span className="block text-[12px] text-[#67756a]">
+                          <span className="block text-[12px] text-[#ffffff]">
                             Профил
                           </span>
 
-                          <span className="block text-[14px] font-semibold text-[#24382b]">
+                          <span className="block text-[14px] font-semibold text-[#9a9a9a]">
                             {me?.firstName || me?.email || "Моят акаунт"}
                           </span>
                         </span>
@@ -545,33 +537,72 @@ export default function Header() {
                           <div className="ml-3 pl-3 border-l border-black/10 pb-2">
                             {accountMenu.map((item) => {
                               const Icon = item.icon;
+                              const isSubmenuOpen =
+                                !!mobileSubmenus[item.label];
 
                               if (item.children) {
                                 return (
-                                  <div key={item.label} className="py-1">
-                                    <div className="flex items-center gap-2 px-2 py-2 text-[13px] font-semibold text-[#506057]">
-                                      <Icon size={16} />
-                                      {item.label}
-                                    </div>
+                                  <div key={item.label} className="p-1">
+                                    {/* Бутон за отваряне/затваряне на Дропдауна */}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setMobileSubmenus((prev) => ({
+                                          ...prev,
+                                          [item.label]: !prev[item.label],
+                                        }))
+                                      }
+                                      className="w-full flex items-center justify-between px-2 py-2 font-semibold text-[#ffffff] hover:bg-white/10 rounded-lg transition-colors"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <Icon size={16} />
+                                        {item.label}
+                                      </div>
+                                      {/* Икона, която се върти спрямо състоянието */}
+                                      <motion.div
+                                        animate={{
+                                          rotate: isSubmenuOpen ? 180 : 0,
+                                        }}
+                                        transition={{ duration: 0.2 }}
+                                      >
+                                        <FiChevronDown size={16} />
+                                      </motion.div>
+                                    </button>
 
-                                    <div className="ml-4 border-l border-black/10 pl-2">
-                                      {item.children.map((child) => (
-                                        <NavLink
-                                          key={child.to}
-                                          to={child.to}
-                                          onClick={handleNavClick}
-                                          className={({ isActive }) =>
-                                            `block px-3 py-2.5 rounded-lg text-[13px] ${
-                                              isActive
-                                                ? "bg-[#eef4ec] text-[#1e4d2b] font-semibold"
-                                                : "text-[#526057] hover:bg-[#f5f8f4]"
-                                            }`
-                                          }
+                                    {/* Анимиран Дропдаун за децата */}
+                                    <AnimatePresence initial={false}>
+                                      {isSubmenuOpen && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{
+                                            height: "auto",
+                                            opacity: 1,
+                                          }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          className="overflow-hidden"
                                         >
-                                          {child.label}
-                                        </NavLink>
-                                      ))}
-                                    </div>
+                                          <div className="ml-4 border-l border-black/10 pl-2 mt-1">
+                                            {item.children.map((child) => (
+                                              <NavLink
+                                                key={child.to}
+                                                to={child.to}
+                                                end 
+                                                onClick={handleNavClick}
+                                                className={({ isActive }) =>
+                                                  `block ps-6 pe-3 py-2.5 rounded-lg text-start text-sm ${
+                                                    isActive
+                                                      ? "bg-[#eef4ec] text-[#1e4d2b] font-semibold"
+                                                      : "text-[#ffffff] hover:bg-[#f5f8f4]"
+                                                  }`
+                                                }
+                                              >
+                                                {child.label}
+                                              </NavLink>
+                                            ))}
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
                                   </div>
                                 );
                               }
@@ -580,12 +611,13 @@ export default function Header() {
                                 <NavLink
                                   key={item.to}
                                   to={item.to}
+                                  end 
                                   onClick={handleNavClick}
                                   className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold ${
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text- font-semibold ${
                                       isActive
                                         ? "bg-[#eef4ec] text-[#1e4d2b]"
-                                        : "text-[#314338] hover:bg-[#f5f8f4]"
+                                        : "text-[#ffffff] hover:bg-[#f5f8f4]"
                                     }`
                                   }
                                 >
@@ -598,7 +630,7 @@ export default function Header() {
                             <button
                               type="button"
                               onClick={handleLogout}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-lg text-[13px] font-semibold text-red-600 hover:bg-red-50"
+                              className="w-full flex justify-end items-center gap-3 px-3 py-2.5 mt-1 rounded-lg text- font-semibold text-red-600 hover:bg-red-50"
                             >
                               <FiLogOut size={16} />
                               Изход

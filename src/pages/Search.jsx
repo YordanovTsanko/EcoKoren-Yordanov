@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiSearch, FiX } from "react-icons/fi";
-import { setQuery, clearQuery } from "../store/slices/searchSlice.js";
 
 const listVariants = {
   hidden: {},
@@ -64,15 +63,12 @@ export default function Search() {
         <FiSearch className="text-lg text-soil/50" />
         <input
           type="text"
-          value={query}
-          onChange={(event) => dispatch(setQuery(event.target.value))}
           placeholder="Търси по име, напр. „домат“ или „ягода“…"
           className="w-full bg-transparent text-sm text-soil placeholder:text-soil/40 focus:outline-none"
         />
         {query && (
           <button
             type="button"
-            onClick={() => dispatch(clearQuery())}
             aria-label="Изчисти търсенето"
             className="text-soil/40 hover:text-soil"
           >

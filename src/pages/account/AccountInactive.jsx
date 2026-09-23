@@ -1,6 +1,6 @@
 import { useDispatch, useSelector } from "react-redux";
-import { fetchMe } from "../store/slices/usersSlice";
-import { logout } from "../store/slices/authSlice";
+import { fetchMe } from "../../store/slices/usersSlice";
+import { logout } from "../../store/slices/authSlice";
 
 export default function AccountInactive() {
   const dispatch = useDispatch();

@@ -67,30 +67,30 @@ export default function AddressModal({ isOpen, onClose, initialAddress, onSave }
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="text- font-bold uppercase tracking-[0.12em] text-black/40">Улица</label>
+              <label className="text- font-bold uppercase text-xs tracking-[0.12em] text-black/40">Улица</label>
               <input name="street" value={form.street} onChange={handleChange} placeholder="ул. Пример 1" className={`mt-1.5 ${inputCls}`} />
             </div>
             <div>
-              <label className="text- font-bold uppercase tracking-[0.12em] text-black/40">Град</label>
+              <label className="text- font-bold uppercase text-xs tracking-[0.12em] text-black/40">Град</label>
               <input name="city" value={form.city} onChange={handleChange} placeholder="София" className={`mt-1.5 ${inputCls}`} />
             </div>
             <div>
-              <label className="text- font-bold uppercase tracking-[0.12em] text-black/40">Пощенски код</label>
+              <label className="text- font-bold uppercase text-xs tracking-[0.12em] text-black/40">Пощенски код</label>
               <input name="postalCode" value={form.postalCode} onChange={handleChange} placeholder="1000" className={`mt-1.5 ${inputCls}`} />
             </div>
             <div>
-              <label className="text- font-bold uppercase tracking-[0.12em] text-black/40">Област / Щат</label>
+              <label className="text- font-bold uppercase text-xs tracking-[0.12em] text-black/40">Област / Щат</label>
               <input name="state" value={form.state} onChange={handleChange} placeholder="София" className={`mt-1.5 ${inputCls}`} />
             </div>
             <div>
-              <label className="text- font-bold uppercase tracking-[0.12em] text-black/40">Държава</label>
+              <label className="text- font-bold uppercase text-xs tracking-[0.12em] text-black/40">Държава</label>
               <input name="country" value={form.country} onChange={handleChange} placeholder="България" className={`mt-1.5 ${inputCls}`} />
             </div>
           </div>
 
           <div className="mt-6 flex gap-2.5">
             <button type="button" onClick={onClose} className="cursor-pointer flex-1 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-bold hover:bg-black/[0.03]">Отказ</button>
-            <button type="button" onClick={handleSaveClick} className={`cursor-pointer flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition active:scale-[0.98] ${confirmStep? "bg-amber-600 hover:bg-amber-700" : "bg-[#1e4d2b] hover:bg-[#0f2e1f]"}`}>
+            <button type="button" onClick={handleSaveClick} className={`cursor-pointer flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition active:scale-[0.98] ${confirmStep? "bg-green-800 hover:bg-green-900" : "bg-[#1e4d2b] hover:bg-[#0f2e1f]"}`}>
               {confirmStep? "Потвърди запазването" : "Запази"}
             </button>
           </div>

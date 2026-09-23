@@ -5,7 +5,7 @@ import Features from "../components/home/Features.jsx";
 import { useSelector } from "react-redux";
 
 export default function Home() {
-  const allProducts = useSelector((state) => state.products.products);
+  const allProducts = useSelector((state) => state.products.items);
 
   return (
     <>

@@ -1,328 +1,326 @@
-import { createSlice } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axiosClient from "../../api/axiosClient";
+
+function buildProductFormData(fields, images) {
+  const formData = new FormData();
+  if (fields.name !== undefined) formData.append("name", fields.name);
+  if (fields.description !== undefined)
+    formData.append("description", fields.description);
+  if (fields.type !== undefined) formData.append("type", fields.type);
+  if (fields.quantityType !== undefined)
+    formData.append("quantityType", fields.quantityType);
+  if (fields.quantity !== undefined)
+    formData.append("quantity", fields.quantity);
+  if (fields.price !== undefined) formData.append("price", fields.price);
+  if (fields.isActive !== undefined)
+    formData.append("isActive", fields.isActive);
+  if (fields.features !== undefined)
+    formData.append("features", JSON.stringify(fields.features));
+  if (images && images.length > 0) {
+    images.forEach((file) => {
+      formData.append("images", file); 
+    });
+  } 
+  return formData;
+}
+
+function extractErrorMessage(err, fallback) {
+  return err.response?.data?.message || err.message || fallback;
+}
+
+// ------------------------------------------------------------- thunks ----
+
+export const fetchProducts = createAsyncThunk(
+  "products/fetchAll",
+  async (overrideParams = {}, { getState, rejectWithValue }) => {
+    try {
+      const { filters, pagination } = getState().products;
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+        sort: filters.sort,
+        order: filters.order,
+        ...(filters.type && { type: filters.type }),
+        ...(filters.quantityType && { quantityType: filters.quantityType }),
+        ...(filters.minPrice !== "" &&
+          filters.minPrice != null && { minPrice: filters.minPrice }),
+        ...(filters.maxPrice !== "" &&
+          filters.maxPrice != null && { maxPrice: filters.maxPrice }),
+        ...(filters.search && { search: filters.search }),
+        ...(filters.isActive !== undefined && { isActive: filters.isActive }),
+        ...overrideParams,
+      };
+      const { data } = await axiosClient.get("/products", { params });
+      return data.data; // { items, pagination }
+    } catch (err) {
+      return rejectWithValue(
+        extractErrorMessage(err, "Грешка при зареждане на продуктите."),
+      );
+    }
+  },
+);
+
+export const fetchProductById = createAsyncThunk(
+  "products/fetchOne",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await axiosClient.get(`/products/${id}`);
+      return data.data.product;
+    } catch (err) {
+      return rejectWithValue(
+        extractErrorMessage(err, "Продуктът не е намерен."),
+      );
+    }
+  },
+);
+
+export const createProduct = createAsyncThunk(
+  "products/createProduct",
+  async ({ fields, imageFiles = [] }, thunkAPI) => {
+    try {
+      const formData = buildProductFormData(fields, imageFiles);
+      
+      const response = await axiosClient.post("/products", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      
+      return response.data.data.product;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(
+        extractErrorMessage(
+          error,
+          "Възникна грешка при създаването на продукта.",
+        ),
+      );
+    }
+  },
+);
+
+
+export const updateProduct = createAsyncThunk(
+  "products/update",
+  async ({ id, fields, imageFiles } = {}, { rejectWithValue }) => {
+    try {
+      const hasFiles = imageFiles && imageFiles.length > 0;
+      const payload = hasFiles
+        ? buildProductFormData(fields, imageFiles)
+        : fields;
+      const { data } = await axiosClient.patch(`/products/${id}`, payload);
+      return data.data.product;
+    } catch (err) {
+      return rejectWithValue(
+        extractErrorMessage(err, "Грешка при обновяване на продукт."),
+      );
+    }
+  },
+);
+
+// Backend soft-delete: маркира isActive:false, не трие записа.
+export const deleteProduct = createAsyncThunk(
+  "products/delete",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await axiosClient.delete(`/products/${id}`);
+      return data.data.product;
+    } catch (err) {
+      return rejectWithValue(
+        extractErrorMessage(err, "Грешка при изтриване на продукт."),
+      );
+    }
+  },
+);
+
+export const restoreProduct = createAsyncThunk(
+  "products/restore",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await axiosClient.patch(`/products/${id}/restore`);
+      return data.data.product;
+    } catch (err) {
+      return rejectWithValue(
+        extractErrorMessage(err, "Грешка при възстановяване на продукт."),
+      );
+    }
+  },
+);
+
+// -------------------------------------------------------------- slice ----
+
+const initialFilters = {
+  type: "",
+  quantityType: "", // 'kg' | 'l' | 'piece'
+  minPrice: "",
+  maxPrice: "",
+  search: "",
+  isActive: true, // true | false — умишлено без "всички", виж бележка №5 горе
+  sort: "createdAt", // 'createdAt' | 'updatedAt' | 'name' | 'price' | 'quantity'
+  order: "desc", // 'asc' | 'desc'
+};
 
 const initialState = {
-  products: [
-    // readyToUse - Зареждай от нас
-    {
-      id: 1,
-      name: 'Розов Домат - Пинк Рок',
-      price: 1.99,
-      oldPrice: 2.49,
-      discountPercent: 20,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?q=80&w=800'
-    },
-    {
-      id: 2,
-      name: 'Краставица - Гергана',
-      price: 1.99,
-      oldPrice: 2.35,
-      discountPercent: 15,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1604977042946-1eecc30f269e?q=80&w=800'
-    },
-    {
-      id: 3,
-      name: 'Магданоз',
-      price: 1.49,
-      oldPrice: 1.65,
-      discountPercent: 10,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://kaufland.media.schwarz/is/image/schwarz/vegetables-herbs-spices-parsley-detail-1?JGstbGVnYWN5LW9uc2l0ZS00JA=='
-    },
-    {
-      id: 4,
-      name: 'Босилек - Лилав',
-      price: 2.20,
-      category: 'readyToUse',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://gardentime-bg.decorexpro.com/wp-content/uploads/2018/11/6-25-360x480.jpg'
-    },
-    {
-      id: 5,
-      name: 'Чушка - Капия',
-      price: 2.50,
-      category: 'readyToUse',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?q=80&w=800'
-    },
-    {
-      id: 6,
-      name: 'Ягода - Албион',
-      price: 2.80,
-      category: 'readyToUse',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?q=80&w=800'
-    },
-    {
-      id: 7,
-      name: 'Спанак - Матадор',
-      price: 1.60,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?q=80&w=800'
-    },
-    {
-      id: 8,
-      name: 'Рукола',
-      price: 1.80,
-      oldPrice: 2.00,
-      discountPercent: 10,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1518843875459-f738682238a6?q=80&w=800'
-    },
-    {
-      id: 9,
-      name: 'Тиквичка - Златиста',
-      price: 2.10,
-      category: 'readyToUse',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?q=80&w=800'
-    },
-    {
-      id: 10,
-      name: 'Патладжан - Черен Красавец',
-      price: 2.40,
-      price: 2.40,
-      oldPrice: 2.90,
-      discountPercent: 17,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1613881553903-4543d4c2d30d?q=80&w=800'
-    },
-    {
-      id: 11,
-      name: 'Мента - Мароканска',
-      price: 1.90,
-      category: 'readyToUse',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1628558436375-a9d5e3d8d5cd?q=80&w=800'
-    },
-    {
-      id: 12,
-      name: 'Копър - Грибовски',
-      price: 1.30,
-      category: 'readyToUse',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1506368083636-6defb67639a7?q=80&w=800'
-    },
+  items: [],
+  pagination: { page: 1, limit: 20, total: 0, pages: 1 },
+  filters: initialFilters,
+  status: "idle", // idle | loading | succeeded | failed
+  error: null,
 
-    // seeds - Семена
-    {
-      id: 13,
-      name: 'Семена - Домат Розов Гигант',
-      price: 1.20,
-      oldPrice: 1.50,
-      discountPercent: 20,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?q=80&w=800'
-    },
-    {
-      id: 14,
-      name: 'Семена - Краставица Корнишон',
-      price: 0.99,
-      category: 'seeds',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1589621316382-008455b857cd?q=80&w=800'
-    },
-    {
-      id: 15,
-      name: 'Семена - Пипер Шипка',
-      price: 1.10,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?q=80&w=800'
-    },
-    {
-      id: 16,
-      name: 'Семена - Морков Нантски',
-      price: 0.89,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1447175008436-054170c2e979?q=80&w=800'
-    },
-    {
-      id: 17,
-      name: 'Семена - Маруля Батавия',
-      price: 0.95,
-      oldPrice: 1.20,
-      discountPercent: 21,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1556801714-2d5c86f2a85b?q=80&w=800'
-    },
-    {
-      id: 18,
-      name: 'Семена - Тиква Цигулка',
-      price: 1.50,
-      category: 'seeds',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1506917728037-b6af01a7d403?q=80&w=800'
-    },
-    {
-      id: 19,
-      name: 'Семена - Босилек Дженовезе',
-      price: 0.99,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1618164435735-413d3abaf39d?q=80&w=800'
-    },
-    {
-      id: 20,
-      name: 'Семена - Ягода Месечна',
-      price: 1.80,
-      category: 'seeds',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?q=80&w=800'
-    },
-    {
-      id: 21,
-      name: 'Семена - Диня Кримсон Суит',
-      price: 1.40,
-      oldPrice: 1.80,
-      discountPercent: 22,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1589984662646-e7b2e4962f18?q=80&w=800'
-    },
-    {
-      id: 22,
-      name: 'Семена - Копър',
-      price: 0.79,
-      category: 'seeds',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1518568403628-df60788f2c2f?q=80&w=800'
-    },
+  selected: null,
+  selectedStatus: "idle",
+  selectedError: null,
 
-    // seedlings - Разсад
-    {
-      id: 23,
-      name: 'Разсад - Домат Биволско Сърце',
-      price: 1.20,
-      category: 'seedlings',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1592845266293-67a79fb6a05d?q=80&w=800'
-    },
-    {
-      id: 24,
-      name: 'Разсад - Краставица Дълга',
-      price: 1.10,
-      category: 'seedlings',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1604977042946-1eecc30f269e?q=80&w=800'
-    },
-    {
-      id: 25,
-      name: 'Разсад - Пипер Капия',
-      price: 1.25,
-      oldPrice: 1.50,
-      discountPercent: 17,
-      category: 'seedlings',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?q=80&w=800'
-    },
-    {
-      id: 26,
-      name: 'Разсад - Тиквичка',
-      price: 1.00,
-      category: 'seedlings',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?q=80&w=800'
-    },
-    {
-      id: 27,
-      name: 'Разсад - Ягода Албион',
-      price: 1.80,
-      category: 'seedlings',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?q=80&w=800'
-    },
-    {
-      id: 28,
-      name: 'Разсад - Босилек',
-      price: 1.15,
-      category: 'seedlings',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://gardentime-bg.decorexpro.com/wp-content/uploads/2018/11/6-25-360x480.jpg'
-    },
-    {
-      id: 29,
-      name: 'Разсад - Диня',
-      price: 1.30,
-      oldPrice: 1.60,
-      discountPercent: 19,
-      category: 'seedlings',
-      newProduct: 'no',
-      discount: 'yes',
-      image: 'https://images.unsplash.com/photo-1589984662646-e7b2e4962f18?q=80&w=800'
-    },
-    {
-      id: 30,
-      name: 'Разсад - Пъпеш Медена Роса',
-      price: 1.30,
-      category: 'seedlings',
-      newProduct: 'yes',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1571575173700-afb9492e6a50?q=80&w=800'
-    },
-    {
-      id: 31,
-      name: 'Разсад - Патладжан',
-      price: 1.20,
-      category: 'seedlings',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1613881553903-4543d4c2d30d?q=80&w=800'
-    },
-    {
-      id: 32,
-      name: 'Разсад - Спанак',
-      price: 0.90,
-      category: 'seedlings',
-      newProduct: 'no',
-      discount: 'no',
-      image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?q=80&w=800'
-    },
-]
+  mutationStatus: "idle", // за create/update/delete/restore спинъри
+  mutationError: null,
 };
 
 const productsSlice = createSlice({
-  name: 'products',
+  name: "products",
   initialState,
-  reducers: {}
-})
+  reducers: {
+    setProductFilters(state, action) {
+      state.filters = { ...state.filters, ...action.payload };
+      state.pagination.page = 1;
+    },
+    resetProductFilters(state) {
+      state.filters = initialFilters;
+      state.pagination.page = 1;
+    },
+    setProductsPage(state, action) {
+      state.pagination.page = action.payload;
+    },
+    setProductsLimit(state, action) {
+      state.pagination.limit = action.payload;
+      state.pagination.page = 1;
+    },
+    clearSelectedProduct(state) {
+      state.selected = null;
+      state.selectedStatus = "idle";
+      state.selectedError = null;
+    },
+    clearProductMutationError(state) {
+      state.mutationError = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // fetchProducts
+      .addCase(fetchProducts.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(fetchProducts.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.items = action.payload.items;
+        state.pagination = action.payload.pagination;
+      })
+      .addCase(fetchProducts.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload;
+      })
 
-export default productsSlice.reducer
+      // fetchProductById
+      .addCase(fetchProductById.pending, (state) => {
+        state.selectedStatus = "loading";
+        state.selectedError = null;
+      })
+      .addCase(fetchProductById.fulfilled, (state, action) => {
+        state.selectedStatus = "succeeded";
+        state.selected = action.payload;
+      })
+      .addCase(fetchProductById.rejected, (state, action) => {
+        state.selectedStatus = "failed";
+        state.selectedError = action.payload;
+      })
+
+      // createProduct
+      .addCase(createProduct.pending, (state) => {
+        state.mutationStatus = "loading";
+        state.mutationError = null;
+      })
+      .addCase(createProduct.fulfilled, (state, action) => {
+        state.mutationStatus = "succeeded";
+        state.items.unshift(action.payload);
+        state.pagination.total += 1;
+      })
+      .addCase(createProduct.rejected, (state, action) => {
+        state.mutationStatus = "failed";
+        state.mutationError = action.payload;
+      })
+
+      // updateProduct
+      .addCase(updateProduct.pending, (state) => {
+        state.mutationStatus = "loading";
+        state.mutationError = null;
+      })
+      .addCase(updateProduct.fulfilled, (state, action) => {
+        state.mutationStatus = "succeeded";
+        const idx = state.items.findIndex((p) => p._id === action.payload._id);
+        if (idx !== -1) state.items[idx] = action.payload;
+        if (state.selected?._id === action.payload._id)
+          state.selected = action.payload;
+      })
+      .addCase(updateProduct.rejected, (state, action) => {
+        state.mutationStatus = "failed";
+        state.mutationError = action.payload;
+      })
+
+      // deleteProduct (soft delete → isActive:false)
+      .addCase(deleteProduct.pending, (state) => {
+        state.mutationStatus = "loading";
+        state.mutationError = null;
+      })
+      .addCase(deleteProduct.fulfilled, (state, action) => {
+        state.mutationStatus = "succeeded";
+        // Ако текущият изглед показва активни продукти, деактивираният
+        // вече не отговаря на филтъра — маха се от списъка. Ако изгледът
+        // вече е върху неактивни, просто обновяваме реда му.
+        if (state.filters.isActive !== false) {
+          state.items = state.items.filter((p) => p._id !== action.payload._id);
+          state.pagination.total = Math.max(0, state.pagination.total - 1);
+        } else {
+          const idx = state.items.findIndex(
+            (p) => p._id === action.payload._id,
+          );
+          if (idx !== -1) state.items[idx] = action.payload;
+        }
+      })
+      .addCase(deleteProduct.rejected, (state, action) => {
+        state.mutationStatus = "failed";
+        state.mutationError = action.payload;
+      })
+
+      // restoreProduct (isActive:true)
+      .addCase(restoreProduct.pending, (state) => {
+        state.mutationStatus = "loading";
+        state.mutationError = null;
+      })
+      .addCase(restoreProduct.fulfilled, (state, action) => {
+        state.mutationStatus = "succeeded";
+        if (state.filters.isActive === false) {
+          state.items = state.items.filter((p) => p._id !== action.payload._id);
+          state.pagination.total = Math.max(0, state.pagination.total - 1);
+        } else {
+          const idx = state.items.findIndex(
+            (p) => p._id === action.payload._id,
+          );
+          if (idx !== -1) state.items[idx] = action.payload;
+        }
+      })
+      .addCase(restoreProduct.rejected, (state, action) => {
+        state.mutationStatus = "failed";
+        state.mutationError = action.payload;
+      });
+  },
+});
+
+export const {
+  setProductFilters,
+  resetProductFilters,
+  setProductsPage,
+  setProductsLimit,
+  clearSelectedProduct,
+  clearProductMutationError,
+} = productsSlice.actions;
+
+export default productsSlice.reducer;
