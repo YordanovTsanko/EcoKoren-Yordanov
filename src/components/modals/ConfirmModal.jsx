@@ -30,7 +30,7 @@ export default function ConfirmModal({
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-black/40 transition hover:bg-black/5 hover:text-black/60"
+              className="rounded-lg p-1.5 text-black/40 transition cursor-pointer hover:bg-black/5 hover:text-black/60"
             >
               <FiX size={18} />
             </button>
@@ -47,14 +47,14 @@ export default function ConfirmModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-bold text-[#0f2e1f] transition hover:bg-black/[0.03]"
+              className="flex-1 rounded-xl border cursor-pointer border-black/10 bg-white px-4 py-2.5 text-sm font-bold text-[#0f2e1f] transition hover:bg-black/[0.03]"
             >
               {cancelText}
             </button>
             <button
               type="button"
               onClick={onConfirm}
-              className="flex-1 rounded-xl bg-[#1e4d2b] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0f2e1f] active:scale-[0.98]"
+              className="flex-1 rounded-xl bg-[#1e4d2b] cursor-pointer px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0f2e1f] active:scale-[0.98]"
             >
               {confirmText}
             </button>

@@ -1,10 +1,22 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { useDispatch, useSelector } from "react-redux";
+
 import { useFormik } from "formik";
+
 import * as Yup from "yup";
-import { FiX, FiUpload, FiPlus, FiAlertCircle, FiLoader } from "react-icons/fi";
+
+import {
+  FiX,
+  FiUpload,
+  FiPlus,
+  FiAlertCircle,
+  FiLoader,
+} from "react-icons/fi";
+
 import {
   createProduct,
+  updateProduct,
   clearProductMutationError,
 } from "../../store/slices/productsSlice";
 
@@ -35,6 +47,25 @@ const EMPTY_FORM = {
   price: "",
 };
 
+const normalizeProductType = (type) => {
+  const normalized = String(type ?? "")
+    .trim()
+    .toLowerCase();
+
+  const map = {
+    плод: "fruits",
+    fruits: "fruits",
+
+    зеленчук: "vegetables",
+    vegetables: "vegetables",
+
+    друго: "other",
+    other: "other",
+  };
+
+  return map[normalized] ?? "";
+};
+
 const inputCls =
   "w-full rounded-xl border border-[#102f20]/10 px-3.5 py-2.5 text-sm text-[#102f20] outline-none placeholder:text-[#102f20]/30 focus:border-[#1e4d2b] focus:ring-2 focus:ring-[#1e4d2b]/15";
 
@@ -43,16 +74,6 @@ const labelCls =
 
 const errorInputCls =
   "border-red-300 focus:border-red-500 focus:ring-red-500/10";
-
-const getWordCount = (value) => {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return 0;
-  }
-
-  return trimmed.split(/\s+/).length;
-};
 
 const limitWords = (value, maxWords) => {
   if (!value.trim()) {
@@ -86,12 +107,11 @@ const productValidationSchema = Yup.object({
     ),
 
   type: Yup.string()
-    .trim()
-    .required("Типът е задължителен.")
-    .max(
-      MAX_TYPE_CHARS,
-      `Типът може да съдържа максимум ${MAX_TYPE_CHARS} символа.`,
-    ),
+    .oneOf(
+      PRODUCT_TYPE_OPTIONS.map((option) => option.value),
+      "Избери валиден тип.",
+    )
+    .required("Типът е задължителен."),
 
   quantityType: Yup.string()
     .oneOf(
@@ -113,77 +133,85 @@ const productValidationSchema = Yup.object({
     .typeError("Цената трябва да бъде число.")
     .required("Цената е задължителна.")
     .min(0, "Цената не може да бъде отрицателна.")
-    .max(MAX_NUMBER_VAL, `Цената не може да надвишава ${MAX_NUMBER_VAL}.`)
+    .max(
+      MAX_NUMBER_VAL,
+      `Цената не може да надвишава ${MAX_NUMBER_VAL}.`,
+    )
     .test(
       "is-decimal",
       "Цената може да има максимум два знака след запетаята.",
-      (value) => value === undefined || /^\d+(\.\d{1,2})?$/.test(String(value)),
+      (value) =>
+        value === undefined ||
+        /^\d+(\.\d{1,2})?$/.test(String(value)),
     ),
 });
 
-export default function ProductModal({ open, onClose, onCreated }) {
+export default function ProductModal({
+  open,
+  onClose,
+  onCreated,
+  onUpdated,
+  edit = false,
+}) {
   const dispatch = useDispatch();
 
-  const mutationStatus = useSelector((state) => state.products.mutationStatus);
+  const selected = useSelector(
+    (state) => state.products.selected,
+  );
 
-  const mutationError = useSelector((state) => state.products.mutationError);
+  const mutationStatus = useSelector(
+    (state) => state.products.mutationStatus,
+  );
+
+  const mutationError = useSelector(
+    (state) => state.products.mutationError,
+  );
 
   const loading = mutationStatus === "loading";
 
   const [featureDraft, setFeatureDraft] = useState("");
   const [features, setFeatures] = useState([]);
+
+  // Старите снимки, които ще останат
+  const [existingImages, setExistingImages] = useState([]);
+
+  // Нови File обекти
   const [imageFiles, setImageFiles] = useState([]);
+
+  // Local preview URL-и за новите файлове
   const [imagePreviews, setImagePreviews] = useState([]);
 
   const fileInputRef = useRef(null);
 
-  const formik = useFormik({
-    initialValues: EMPTY_FORM,
-    validationSchema: productValidationSchema,
-    enableReinitialize: true,
-    validateOnChange: true,
-    validateOnBlur: true,
-    onSubmit: async (values) => {
-      const fields = {
-        name: values.name.trim(),
-        description: values.description.trim(),
-        type: values.type,
-        quantityType: values.quantityType,
-        quantity: Number(values.quantity),
-        price: Number(values.price),
-        features,
-      };
+  const initialValues = useMemo(() => {
+    if (!edit || !selected) {
+      return EMPTY_FORM;
+    }
 
-      const result = await dispatch(
-        createProduct({
-          fields,
-          imageFiles,
-        }),
-      );
+    return {
+      name: selected.name ?? "",
 
-      if (createProduct.fulfilled.match(result)) {
-        resetForm();
+      description: selected.description ?? "",
 
-        onCreated?.(result.payload);
-        onClose?.();
-      }
-    },
-  });
+      type: normalizeProductType(selected.type),
 
-  if (!open) {
-    return null;
-  }
+      quantityType: selected.quantityType ?? "",
 
-  const nameCharCount = formik.values.name.trim().length;
-  const descriptionCharCount = formik.values.description.trim().length;
+      quantity:
+        selected.quantity !== undefined &&
+        selected.quantity !== null
+          ? String(selected.quantity)
+          : "",
 
-  const resetForm = () => {
-    formik.resetForm();
+      price:
+        selected.price !== undefined &&
+        selected.price !== null
+          ? String(selected.price)
+          : "",
+    };
+  }, [edit, selected]);
 
-    setFeatureDraft("");
-    setFeatures([]);
-    setImageFiles([]);
-
+  const resetImagePreviews = () => {
     imagePreviews.forEach((url) => {
       URL.revokeObjectURL(url);
     });
@@ -191,10 +219,184 @@ export default function ProductModal({ open, onClose, onCreated }) {
     setImagePreviews([]);
   };
 
+  const resetForm = () => {
+    formik.resetForm({
+      values: initialValues,
+    });
+
+    setFeatureDraft("");
+
+    setFeatures(
+      edit && selected
+        ? [...(selected.features ?? [])]
+        : [],
+    );
+
+    setExistingImages(
+      edit && selected
+        ? [...(selected.images ?? [])]
+        : [],
+    );
+
+    setImageFiles([]);
+
+    resetImagePreviews();
+  };
+
+  const formik = useFormik({
+    initialValues,
+    validationSchema: productValidationSchema,
+    enableReinitialize: true,
+    validateOnChange: true,
+    validateOnBlur: true,
+
+    onSubmit: async (values) => {
+      const fields = {
+        name: values.name.trim(),
+
+        description: values.description.trim(),
+
+        type: normalizeProductType(values.type),
+
+        quantityType: values.quantityType,
+
+        quantity: Number(values.quantity),
+
+        price: Number(values.price),
+
+        features,
+
+        ...(edit
+          ? {
+              existingImages,
+            }
+          : {}),
+      };
+
+      // Debug само тук, където fields съществува
+      console.log("========== PRODUCT SUBMIT ==========");
+      console.log("EDIT:", edit);
+      console.log("PRODUCT ID:", selected?._id);
+      console.log("FIELDS:", fields);
+      console.log("EXISTING IMAGES:", existingImages);
+      console.log("IMAGE FILES:", imageFiles);
+      console.log("IMAGE FILES COUNT:", imageFiles.length);
+
+      imageFiles.forEach((file, index) => {
+        console.log(`FILE ${index}:`, {
+          name: file?.name,
+          type: file?.type,
+          size: file?.size,
+          isFile:
+            typeof File !== "undefined" &&
+            file instanceof File,
+        });
+      });
+
+      console.log("====================================");
+
+      const result = edit
+        ? await dispatch(
+            updateProduct({
+              id: selected?._id,
+              fields,
+              imageFiles,
+            }),
+          )
+        : await dispatch(
+            createProduct({
+              fields,
+              imageFiles,
+            }),
+          );
+
+      if (edit) {
+        if (updateProduct.fulfilled.match(result)) {
+          resetForm();
+
+          onUpdated?.(result.payload);
+
+          onClose?.();
+        }
+
+        return;
+      }
+
+      if (createProduct.fulfilled.match(result)) {
+        resetForm();
+
+        onCreated?.(result.payload);
+
+        onClose?.();
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    dispatch(clearProductMutationError());
+
+    imagePreviews.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+
+    setFeatureDraft("");
+
+    setFeatures(
+      edit && selected
+        ? [...(selected.features ?? [])]
+        : [],
+    );
+
+    setExistingImages(
+      edit && selected
+        ? [...(selected.images ?? [])]
+        : [],
+    );
+
+    setImageFiles([]);
+
+    setImagePreviews([]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, edit, selected, dispatch]);
+
+  if (!open) {
+    return null;
+  }
+
+  const nameCharCount =
+    formik.values.name.trim().length;
+
+  const descriptionCharCount =
+    formik.values.description.trim().length;
+
+  const totalImageCount =
+    existingImages.length + imageFiles.length;
+
   const handleClose = () => {
     dispatch(clearProductMutationError());
 
-    resetForm();
+    imagePreviews.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+
+    setFeatureDraft("");
+
+    setFeatures([]);
+
+    setExistingImages([]);
+
+    setImageFiles([]);
+
+    setImagePreviews([]);
+
+    formik.resetForm({
+      values: initialValues,
+    });
 
     onClose?.();
   };
@@ -206,47 +408,85 @@ export default function ProductModal({ open, onClose, onCreated }) {
       return;
     }
 
-    setFeatures((prev) => [...prev, value]);
+    setFeatures((prev) => [
+      ...prev,
+      value,
+    ]);
+
     setFeatureDraft("");
   };
 
   const removeFeature = (index) => {
-    setFeatures((prev) => prev.filter((_, i) => i !== index));
+    setFeatures((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
+  };
+
+  const removeExistingImage = (index) => {
+    setExistingImages((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
   };
 
   const handleDescriptionChange = (e) => {
-    const value = limitWords(e.target.value, MAX_DESCRIPTION_CHARS);
+    const value = limitWords(
+      e.target.value,
+      MAX_DESCRIPTION_CHARS,
+    );
 
-    formik.setFieldValue("description", value);
+    formik.setFieldValue(
+      "description",
+      value,
+    );
   };
 
   const handleImagesSelected = (e) => {
-    const files = Array.from(e.target.files ?? []);
+    const files = Array.from(
+      e.target.files ?? [],
+    );
+
     if (files.length === 0) {
       return;
     }
-    const remainingSlots = MAX_IMAGES - imageFiles.length;
+
+    const remainingSlots =
+      MAX_IMAGES - totalImageCount;
+
     if (remainingSlots <= 0) {
       e.target.value = "";
       return;
     }
+
     const filesToAdd = files
-      .filter((file) => file.type.startsWith("image/"))
+      .filter((file) =>
+        file.type.startsWith("image/"),
+      )
       .slice(0, remainingSlots);
+
     if (filesToAdd.length === 0) {
       e.target.value = "";
       return;
     }
-    setImageFiles((prev) => [...prev, ...filesToAdd]);
+
+    setImageFiles((prev) => [
+      ...prev,
+      ...filesToAdd,
+    ]);
+
     setImagePreviews((prev) => [
       ...prev,
-      ...filesToAdd.map((file) => URL.createObjectURL(file)),
+      ...filesToAdd.map((file) =>
+        URL.createObjectURL(file),
+      ),
     ]);
+
     e.target.value = "";
   };
 
-  const removeImage = (index) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeNewImage = (index) => {
+    setImageFiles((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
 
     setImagePreviews((prev) => {
       if (prev[index]) {
@@ -258,7 +498,8 @@ export default function ProductModal({ open, onClose, onCreated }) {
   };
 
   const fieldError = (fieldName) =>
-    formik.touched[fieldName] && formik.errors[fieldName];
+    formik.touched[fieldName] &&
+    formik.errors[fieldName];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -275,10 +516,16 @@ export default function ProductModal({ open, onClose, onCreated }) {
         {/* HEADER */}
         <div className="flex items-center justify-between border-b border-[#102f20]/8 px-6 py-5">
           <div>
-            <h3 className="text-lg font-black text-[#102f20]">Нов продукт</h3>
+            <h3 className="text-lg font-black text-[#102f20]">
+              {edit
+                ? "Редактиране на продукт"
+                : "Нов продукт"}
+            </h3>
 
             <p className="mt-0.5 text-xs text-[#102f20]/45">
-              Попълнете детайлите за новия продукт.
+              {edit
+                ? "Променете детайлите и запазете продукта."
+                : "Попълнете детайлите за новия продукт."}
             </p>
           </div>
 
@@ -296,7 +543,10 @@ export default function ProductModal({ open, onClose, onCreated }) {
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
           {mutationError && (
             <div className="flex items-start gap-2.5 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-600">
-              <FiAlertCircle size={16} className="mt-0.5 shrink-0" />
+              <FiAlertCircle
+                size={16}
+                className="mt-0.5 shrink-0"
+              />
 
               <span>{mutationError}</span>
             </div>
@@ -304,7 +554,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
 
           {/* NAME */}
           <div>
-            <label className={labelCls}>Име</label>
+            <label className={labelCls}>
+              Име
+            </label>
 
             <input
               name="name"
@@ -314,27 +566,33 @@ export default function ProductModal({ open, onClose, onCreated }) {
               onBlur={formik.handleBlur}
               placeholder="напр. Ябълки Грени Смит"
               className={`${inputCls} ${
-                fieldError("name") ? errorInputCls : ""
+                fieldError("name")
+                  ? errorInputCls
+                  : ""
               }`}
             />
 
             <div className="mt-1.5 flex items-center justify-between">
-            {fieldError("name") ? (
+              {fieldError("name") ? (
                 <p className="text-xs font-semibold text-red-600">
                   {formik.errors.name}
                 </p>
               ) : (
                 <span />
               )}
+
               <span className="text-[10px] text-[#102f20]/30">
-                Максимум {nameCharCount}/{MAX_NAME_CHARS} символа
+                Максимум {nameCharCount}/
+                {MAX_NAME_CHARS} символа
               </span>
             </div>
           </div>
 
           {/* DESCRIPTION */}
           <div>
-            <label className={`${labelCls} mb-0`}>Описание</label>
+            <label className={`${labelCls} mb-0`}>
+              Описание
+            </label>
 
             <textarea
               name="description"
@@ -344,7 +602,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
               onBlur={formik.handleBlur}
               placeholder="Кратко описание на продукта"
               className={`${inputCls} mt-1.5 resize-none ${
-                fieldError("description") ? errorInputCls : ""
+                fieldError("description")
+                  ? errorInputCls
+                  : ""
               }`}
             />
 
@@ -358,7 +618,8 @@ export default function ProductModal({ open, onClose, onCreated }) {
               )}
 
               <span className="text-[10px] text-[#102f20]/30">
-                Максимум {descriptionCharCount}/{MAX_DESCRIPTION_CHARS} символа
+                Максимум {descriptionCharCount}/
+                {MAX_DESCRIPTION_CHARS} символа
               </span>
             </div>
           </div>
@@ -366,7 +627,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
           {/* TYPE + QUANTITY TYPE */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Тип</label>
+              <label className={labelCls}>
+                Тип
+              </label>
 
               <select
                 name="type"
@@ -374,18 +637,25 @@ export default function ProductModal({ open, onClose, onCreated }) {
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 className={`${inputCls} cursor-pointer bg-white ${
-                  fieldError("type") ? errorInputCls : ""
+                  fieldError("type")
+                    ? errorInputCls
+                    : ""
                 }`}
               >
                 <option value="" disabled>
                   Избери тип
                 </option>
 
-                {PRODUCT_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                {PRODUCT_TYPE_OPTIONS.map(
+                  (option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </option>
+                  ),
+                )}
               </select>
 
               {fieldError("type") && (
@@ -396,7 +666,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
             </div>
 
             <div>
-              <label className={labelCls}>Мярка</label>
+              <label className={labelCls}>
+                Мярка
+              </label>
 
               <select
                 name="quantityType"
@@ -404,18 +676,25 @@ export default function ProductModal({ open, onClose, onCreated }) {
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 className={`${inputCls} cursor-pointer bg-white ${
-                  fieldError("quantityType") ? errorInputCls : ""
+                  fieldError("quantityType")
+                    ? errorInputCls
+                    : ""
                 }`}
               >
                 <option value="" disabled>
                   Избери мярка
                 </option>
 
-                {QUANTITY_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                {QUANTITY_TYPE_OPTIONS.map(
+                  (option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </option>
+                  ),
+                )}
               </select>
 
               {fieldError("quantityType") && (
@@ -429,7 +708,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
           {/* QUANTITY + PRICE */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Количество</label>
+              <label className={labelCls}>
+                Количество
+              </label>
 
               <input
                 name="quantity"
@@ -439,7 +720,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 className={`${inputCls} ${
-                  fieldError("quantity") ? errorInputCls : ""
+                  fieldError("quantity")
+                    ? errorInputCls
+                    : ""
                 }`}
               />
 
@@ -451,7 +734,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
             </div>
 
             <div>
-              <label className={labelCls}>Цена (лв.)</label>
+              <label className={labelCls}>
+                Цена (лв.)
+              </label>
 
               <input
                 name="price"
@@ -462,7 +747,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 className={`${inputCls} ${
-                  fieldError("price") ? errorInputCls : ""
+                  fieldError("price")
+                    ? errorInputCls
+                    : ""
                 }`}
               />
 
@@ -476,12 +763,16 @@ export default function ProductModal({ open, onClose, onCreated }) {
 
           {/* FEATURES */}
           <div>
-            <label className={labelCls}>Характеристики</label>
+            <label className={labelCls}>
+              Характеристики
+            </label>
 
             <div className="flex gap-2">
               <input
                 value={featureDraft}
-                onChange={(e) => setFeatureDraft(e.target.value)}
+                onChange={(e) =>
+                  setFeatureDraft(e.target.value)
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -513,7 +804,9 @@ export default function ProductModal({ open, onClose, onCreated }) {
 
                     <button
                       type="button"
-                      onClick={() => removeFeature(i)}
+                      onClick={() =>
+                        removeFeature(i)
+                      }
                       className="cursor-pointer text-[#1e4d2b]/60 hover:text-[#1e4d2b]"
                       aria-label={`Премахни ${feature}`}
                     >
@@ -528,40 +821,80 @@ export default function ProductModal({ open, onClose, onCreated }) {
           {/* IMAGES */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className={`${labelCls} mb-0`}>Снимки</label>
+              <label
+                className={`${labelCls} mb-0`}
+              >
+                Снимки
+              </label>
 
               <span className="text-[11px] font-bold text-[#102f20]/40">
-                {imageFiles.length}/{MAX_IMAGES}
+                {totalImageCount}/{MAX_IMAGES}
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2.5">
-              {imagePreviews.map((src, i) => (
-                <div
-                  key={src}
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#102f20]/10"
-                >
-                  <img
-                    src={src}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+              {/* EXISTING IMAGES */}
+              {edit &&
+                existingImages.map(
+                  (src, i) => (
+                    <div
+                      key={`${src}-${i}`}
+                      className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#102f20]/10"
+                    >
+                      <img
+                        src={src}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
 
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    className="absolute right-0.5 top-0.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full bg-[#102f20]/70 text-white"
-                    aria-label="Премахни снимка"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeExistingImage(i)
+                        }
+                        className="absolute right-0.5 top-0.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full bg-[#102f20]/70 text-white"
+                        aria-label="Премахни снимка"
+                      >
+                        <FiX size={9} />
+                      </button>
+                    </div>
+                  ),
+                )}
+
+              {/* NEW IMAGE PREVIEWS */}
+              {imagePreviews.map(
+                (src, i) => (
+                  <div
+                    key={src}
+                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#102f20]/10"
                   >
-                    <FiX size={9} />
-                  </button>
-                </div>
-              ))}
+                    <img
+                      src={src}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
 
-              {imageFiles.length < MAX_IMAGES && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeNewImage(i)
+                      }
+                      className="absolute right-0.5 top-0.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full bg-[#102f20]/70 text-white"
+                      aria-label="Премахни снимка"
+                    >
+                      <FiX size={9} />
+                    </button>
+                  </div>
+                ),
+              )}
+
+              {/* ADD IMAGE */}
+              {totalImageCount < MAX_IMAGES && (
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() =>
+                    fileInputRef.current?.click()
+                  }
                   className="grid h-16 w-16 shrink-0 cursor-pointer place-items-center rounded-xl border border-dashed border-[#102f20]/20 text-[#102f20]/40 hover:border-[#1e4d2b] hover:text-[#1e4d2b]"
                   aria-label="Добави снимка"
                 >
@@ -597,12 +930,24 @@ export default function ProductModal({ open, onClose, onCreated }) {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading ||
+              (edit && !selected?._id)
+            }
             className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#1e4d2b] px-4 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(30,77,43,0.18)] hover:bg-[#173d22] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading && <FiLoader size={16} className="animate-spin" />}
+            {loading && (
+              <FiLoader
+                size={16}
+                className="animate-spin"
+              />
+            )}
 
-            {loading ? "Запазване..." : "Запази продукта"}
+            {loading
+              ? "Запазване..."
+              : edit
+                ? "Запази промените"
+                : "Запази продукта"}
           </button>
         </div>
       </form>

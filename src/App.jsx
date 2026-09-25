@@ -22,6 +22,7 @@ import Sessions from "./pages/account/Sessions.jsx";
 import Notifications from "./pages/account/Notifications.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import AdminProductTab from "./pages/admin/AdminProductTab.jsx";
+import AdminGetProduct from "./pages/admin/AdminGetProduct.jsx";
 
 export default function App() {
   const dispatch = useDispatch();
@@ -68,6 +69,7 @@ export default function App() {
           <Route element={<ProtectedRoute requireAdmin />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/products" element={<AdminProductTab />} />
+            <Route path="/admin/products/:id" element={<AdminGetProduct />} />
           </Route>
         </Route>
       </Routes>

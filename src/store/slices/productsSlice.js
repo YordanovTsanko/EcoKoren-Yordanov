@@ -18,9 +18,9 @@ function buildProductFormData(fields, images) {
     formData.append("features", JSON.stringify(fields.features));
   if (images && images.length > 0) {
     images.forEach((file) => {
-      formData.append("images", file); 
+      formData.append("images", file);
     });
-  } 
+  }
   return formData;
 }
 
@@ -79,13 +79,13 @@ export const createProduct = createAsyncThunk(
   async ({ fields, imageFiles = [] }, thunkAPI) => {
     try {
       const formData = buildProductFormData(fields, imageFiles);
-      
+
       const response = await axiosClient.post("/products", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
-      
+
       return response.data.data.product;
     } catch (error) {
       return thunkAPI.rejectWithValue(
@@ -98,32 +98,89 @@ export const createProduct = createAsyncThunk(
   },
 );
 
-
 export const updateProduct = createAsyncThunk(
-  "products/update",
-  async ({ id, fields, imageFiles } = {}, { rejectWithValue }) => {
+  "products/updateProduct",
+  async ({ id, fields, imageFiles = [] }, thunkAPI) => {
     try {
-      const hasFiles = imageFiles && imageFiles.length > 0;
-      const payload = hasFiles
-        ? buildProductFormData(fields, imageFiles)
-        : fields;
-      const { data } = await axiosClient.patch(`/products/${id}`, payload);
-      return data.data.product;
-    } catch (err) {
-      return rejectWithValue(
-        extractErrorMessage(err, "Грешка при обновяване на продукт."),
+      const formData = new FormData();
+
+      Object.entries(fields).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+          return;
+        }
+
+        if (Array.isArray(value)) {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+
+      imageFiles.forEach((file) => {
+        formData.append("images", file);
+      });
+
+      // DEBUG
+      console.log("========== UPDATE PRODUCT DEBUG ==========");
+      console.log("ID:", id);
+      console.log("fields:", fields);
+      console.log("imageFiles:", imageFiles);
+      console.log("imageFiles count:", imageFiles.length);
+
+      imageFiles.forEach((file, index) => {
+        console.log(`imageFiles[${index}]:`, {
+          file,
+          name: file?.name,
+          type: file?.type,
+          size: file?.size,
+          instanceofFile: file instanceof File,
+        });
+      });
+
+      console.log("FormData entries:");
+
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(key, {
+            type: "File",
+            name: value.name,
+            typeValue: value.type,
+            size: value.size,
+            instanceofFile: value instanceof File,
+          });
+        } else {
+          console.log(key, value);
+        }
+      }
+
+      console.log("==========================================");
+
+      const response = await axiosClient.patch(
+        `/products/${id}`,
+        formData,
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("UPDATE PRODUCT ERROR:", error);
+      console.error("SERVER RESPONSE:", error.response?.data);
+
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message ||
+          error.response?.data?.error?.message ||
+          error.message ||
+          "Възникна грешка при редактиране на продукта.",
       );
     }
   },
 );
 
-// Backend soft-delete: маркира isActive:false, не трие записа.
 export const deleteProduct = createAsyncThunk(
   "products/delete",
   async (id, { rejectWithValue }) => {
     try {
-      const { data } = await axiosClient.delete(`/products/${id}`);
-      return data.data.product;
+      await axiosClient.delete(`/products/${id}`);
+      return id;
     } catch (err) {
       return rejectWithValue(
         extractErrorMessage(err, "Грешка при изтриване на продукт."),
@@ -154,7 +211,7 @@ const initialFilters = {
   minPrice: "",
   maxPrice: "",
   search: "",
-  isActive: true, // true | false — умишлено без "всички", виж бележка №5 горе
+  isActive: "all", // true | false — умишлено без "всички", виж бележка №5 горе
   sort: "createdAt", // 'createdAt' | 'updatedAt' | 'name' | 'price' | 'quantity'
   order: "desc", // 'asc' | 'desc'
 };
@@ -264,26 +321,14 @@ const productsSlice = createSlice({
         state.mutationStatus = "failed";
         state.mutationError = action.payload;
       })
-
-      // deleteProduct (soft delete → isActive:false)
       .addCase(deleteProduct.pending, (state) => {
         state.mutationStatus = "loading";
         state.mutationError = null;
       })
       .addCase(deleteProduct.fulfilled, (state, action) => {
         state.mutationStatus = "succeeded";
-        // Ако текущият изглед показва активни продукти, деактивираният
-        // вече не отговаря на филтъра — маха се от списъка. Ако изгледът
-        // вече е върху неактивни, просто обновяваме реда му.
-        if (state.filters.isActive !== false) {
-          state.items = state.items.filter((p) => p._id !== action.payload._id);
-          state.pagination.total = Math.max(0, state.pagination.total - 1);
-        } else {
-          const idx = state.items.findIndex(
-            (p) => p._id === action.payload._id,
-          );
-          if (idx !== -1) state.items[idx] = action.payload;
-        }
+        state.items = state.items.filter((p) => p._id !== action.payload);
+        state.pagination.total = Math.max(0, state.pagination.total - 1);
       })
       .addCase(deleteProduct.rejected, (state, action) => {
         state.mutationStatus = "failed";
